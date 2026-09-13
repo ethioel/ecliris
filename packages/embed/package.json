@@ -1,0 +1,17 @@
+{
+  "name": "@ecliris/embed",
+  "version": "1.0.0",
+  "description": "Client-side Shadow DOM widget for Ecliris",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@ecliris/core": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}
