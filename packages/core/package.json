@@ -1,0 +1,14 @@
+{
+  "name": "@ecliris/core",
+  "version": "1.0.0",
+  "description": "Physics engine for Ecliris visual verification",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "files": [
+    "dist"
+  ]
+}
