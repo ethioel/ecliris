@@ -34,7 +34,8 @@ router.post('/v1/verify', (req: Request, res: Response) => {
     return res.status(403).json({
       success: false,
       error: analysis.reason,
-      score: analysis.score
+      score: analysis.score,
+      details: analysis.details
     });
   }
 
@@ -43,7 +44,12 @@ router.post('/v1/verify', (req: Request, res: Response) => {
     .update(`${siteKey}-${Date.now()}-${analysis.score}`)
     .digest('hex');
 
-  res.json({ success: true, token, score: analysis.score });
+  res.json({ 
+    success: true, 
+    token, 
+    score: analysis.score,
+    details: analysis.details
+  });
 });
 
 export default router;
