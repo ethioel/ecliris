@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { analyzeTelemetry } from './analyzer';
 
-const router = Router();
+const router: Router = Router();
 const sessions = new Map<string, { createdAt: number; siteKey: string }>();
 const SECRET = process.env.ECLIRIS_SECRET || 'dev-secret-change-me';
 

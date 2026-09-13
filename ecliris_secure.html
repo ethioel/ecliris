@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ecliris Secure</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:radial-gradient(ellipse at center,#1a0a2e 0%,#000 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;color:#fff;padding:20px}
+h1{font-weight:200;letter-spacing:6px;margin-bottom:8px;font-size:2.5rem}
+.tagline{opacity:.6;margin-bottom:40px;font-size:14px;letter-spacing:2px}
+.card{background:rgba(10,10,15,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);width:100%;max-width:600px}
+.card.shake{animation:shake .5s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.title{font-size:13px;font-weight:600;letter-spacing:1px;opacity:.85;text-transform:uppercase}
+.viewport{width:100%;height:400px;background:#000;border-radius:8px;overflow:hidden;position:relative;margin-bottom:12px;cursor:none}
+.viewport canvas{display:block}
+.instruction{font-size:14px;text-align:center;margin-bottom:8px;font-weight:500;min-height:22px;color:#88d3ce}
+.status{font-size:13px;opacity:.7;text-align:center;min-height:20px}
+.status.success{color:#00ffcc;opacity:1}
+.status.error{color:#ff4466;opacity:1}
+.status.warning{color:#ffaa00;opacity:1}
+.retry-btn{display:none;margin:16px auto 0;padding:10px 24px;background:linear-gradient(135deg,#6e45e2,#88d3ce);color:#fff;border:none;border-radius:100px;font-weight:600;cursor:pointer;font-size:14px}
+.retry-btn:hover{opacity:.9}
+.retry-btn.show{display:block}
+#result{margin-top:20px;font-size:13px;font-family:monospace;text-align:center;min-height:20px}
+.security-log{margin-top:10px;font-size:11px;opacity:.5;text-align:center;font-family:monospace}
+</style>
+</head>
+<body>
+<h1>ECLIRIS</h1>
+<p class="tagline">Observe the unseen.</p>
+<div class="card" id="card">
+  <div class="header"><span class="title">Ecliris · Security Verification</span></div>
+  <div class="viewport" id="vp"><canvas id="c"></canvas></div>
+  <div class="instruction" id="inst">Loading...</div>
+  <div class="status" id="stat"></div>
+  <button class="retry-btn" id="retry">Try Again</button>
+</div>
+<div id="result"></div>
+<div class="security-log" id="log"></div>
+<script>
+try {
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const vp = document.getElementById('vp');
+const instEl = document.getElementById('inst');
+const statEl = document.getElementById('stat');
+const resultEl = document.getElementById('result');
+const cardEl = document.getElementById('card');
+const retryEl = document.getElementById('retry');
+const logEl = document.getElementById('log');
+
+const G = 200, EH = 15;
+let W, H;
+let particles = [], targets = [], path = [];
+let mouse = {x:0, y:0, on:false};
+let eaten = 0, needed = 0;
+let state = 'init';
+let startTime = 0;
+let firstMoveTime = 0;
+let targetAppearTime = 0;
+
+function resize() {
+  W = vp.clientWidth;
+  H = vp.clientHeight;
+  canvas.width = W;
+  canvas.height = H;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const COLORS = [
+  {n:'blue',   c:'100,200,255'},
+  {n:'purple', c:'180,100,255'},
+  {n:'green',  c:'100,255,180'},
+  {n:'orange', c:'255,180,100'},
+  {n:'pink',   c:'255,100,180'}
+];
+const SIZES = [
+  {n:'small',  r:12},
+  {n:'medium', r:22},
+  {n:'large',  r:32}
+];
+
+function pick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+// SECURITY CHECK 1: Device fingerprinting
+function checkAutomation() {
+  const checks = {
+    webdriver: !!navigator.webdriver,
+    phantom: !!window.callPhantom || !!window._phantom,
+    nightmare: !!window.__nightmare,
+    headless: /HeadlessChrome/.test(navigator.userAgent),
+    selenium: !!document.__selenium_unwrapped || !!document.__driver_evaluate || !!document.__webdriver_evaluate
+  };
+  
+  const detected = Object.entries(checks).filter(([k,v]) => v).map(([k]) => k);
+  logEl.textContent = detected.length ? 'Security: Detected ' + detected.join(', ') : 'Security: Clean';
+  
+  return detected.length === 0;
+}
+
+// SECURITY CHECK 2: Reaction time analysis
+function checkReactionTime() {
+  if (!firstMoveTime || !targetAppearTime) return { pass: false, reason: 'No movement data' };
+  
+  const reaction = firstMoveTime - targetAppearTime;
+  // Humans: 200-500ms
+  // Bots: <50ms (instant) or >1000ms (delayed)
+  
+  if (reaction < 50) return { pass: false, reason: 'Too fast (' + reaction.toFixed(0) + 'ms)' };
+  if (reaction > 1000) return { pass: false, reason: 'Too slow (' + reaction.toFixed(0) + 'ms)' };
+  
+  return { pass: true, reaction: reaction };
+}
+
+// SECURITY CHECK 3: Speed limits
+function checkSpeedLimits(path) {
+  const MAX_SPEED = 2; // 2000px/s
+  for (let i = 1; i < path.length; i++) {
+    const dist = Math.hypot(path[i].x - path[i-1].x, path[i].y - path[i-1].y);
+    const dt = path[i].t - path[i-1].t;
+    if (dt === 0) continue;
+    const speed = dist / dt;
+    if (speed > MAX_SPEED) {
+      return { pass: false, reason: 'Speed exceeded: ' + (speed * 1000).toFixed(0) + 'px/s' };
+    }
+  }
+  return { pass: true };
+}
+
+// SECURITY CHECK 4: Temporal consistency
+function checkTemporalConsistency(path) {
+  if (path.length < 10) return { pass: false, reason: 'Insufficient data' };
+  
+  const intervals = [];
+  for (let i = 1; i < path.length; i++) {
+    intervals.push(path[i].t - path[i-1].t);
+  }
+  
+  const avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+  const variance = intervals.reduce((a,b) => a + Math.pow(b-avg, 2), 0) / intervals.length;
+  
+  // Humans have variable intervals (16-33ms with variance)
+  // Bots have perfectly consistent intervals
+  if (variance < 0.5) {
+    return { pass: false, reason: 'Too consistent (variance: ' + variance.toFixed(2) + ')' };
+  }
+  
+  return { pass: true, variance: variance };
+}
+
+function startGame() {
+  state = 'play';
+  eaten = 0;
+  path = [];
+  startTime = performance.now();
+  firstMoveTime = 0;
+  resultEl.textContent = '';
+  retryEl.classList.remove('show');
+
+  // Check for automation
+  if (!checkAutomation()) {
+    state = 'error';
+    instEl.textContent = 'Automation detected';
+    statEl.textContent = 'Please use a regular browser';
+    statEl.className = 'status error';
+    return;
+  }
+
+  particles = [];
+  for (let i = 0; i < 600; i++) {
+    particles.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx: 0, vy: 0,
+      s: Math.random()*1.5+0.5,
+      a: Math.random()*0.6+0.2
+    });
+  }
+
+  const total = 3 + Math.floor(Math.random()*3);
+  const matchColor = pick(COLORS);
+  const matchSize = pick(SIZES);
+  const byColor = Math.random() > 0.5;
+
+  targets = [];
+  for (let i = 0; i < total; i++) {
+    const isMatch = (i < 2) ? true : Math.random() > 0.5;
+    const col = isMatch && byColor ? matchColor : pick(COLORS);
+    const siz = isMatch && !byColor ? matchSize : pick(SIZES);
+
+    targets.push({
+      x: 60 + Math.random()*(W-120),
+      y: 60 + Math.random()*(H-120),
+      r: siz.r,
+      col: col,
+      match: (byColor && col.n === matchColor.n) || (!byColor && siz.n === matchSize.n),
+      dead: false
+    });
+  }
+
+  needed = targets.filter(t => t.match).length;
+  targetAppearTime = performance.now();
+
+  if (byColor) {
+    instEl.textContent = 'Consume all ' + matchColor.n + ' stars (' + needed + ')';
+  } else {
+    instEl.textContent = 'Consume all ' + matchSize.n + ' stars (' + needed + ')';
+  }
+  statEl.textContent = eaten + ' / ' + needed;
+  statEl.className = 'status';
+}
+
+vp.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - r.left;
+  mouse.y = e.clientY - r.top;
+  mouse.on = true;
+  
+  if (!firstMoveTime) firstMoveTime = performance.now();
+  
+  path.push({x:mouse.x, y:mouse.y, t:performance.now()});
+  if (path.length > 500) path.shift();
+});
+vp.addEventListener('mouseleave', () => { mouse.on = false; });
+
+function frame() {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const p of particles) {
+    if (mouse.on) {
+      const dx = mouse.x-p.x, dy = mouse.y-p.y;
+      const d = Math.hypot(dx, dy);
+      if (d < G && d > EH) {
+        const f = (G-d)/G;
+        p.vx += (dx/d)*f*0.5;
+        p.vy += (dy/d)*f*0.5;
+      }
+      if (d < EH*2.5) p.s = Math.min(p.s*1.03, 4);
+      if (d < EH) {
+        p.x = Math.random()*W;
+        p.y = Math.random()*H;
+        p.vx = 0; p.vy = 0;
+        p.s = Math.random()*1.5+0.5;
+      }
+    }
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.95; p.vy *= 0.95;
+    ctx.fillStyle = 'rgba(255,255,255,'+p.a+')';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  for (const t of targets) {
+    if (t.dead) continue;
+    if (mouse.on && state === 'play') {
+      const d = Math.hypot(mouse.x-t.x, mouse.y-t.y);
+      if (d < EH + t.r) {
+        if (t.match) {
+          t.dead = true;
+          eaten++;
+          statEl.textContent = eaten + ' / ' + needed;
+          if (eaten >= needed) {
+            state = 'verify';
+            verify();
+          }
+        } else {
+          statEl.textContent = 'Wrong star! ' + eaten + ' / ' + needed;
+          statEl.className = 'status warning';
+          setTimeout(() => {
+            if (state === 'play') {
+              statEl.textContent = eaten + ' / ' + needed;
+              statEl.className = 'status';
+            }
+          }, 800);
+        }
+      }
+    }
+    const g = ctx.createRadialGradient(t.x,t.y,0,t.x,t.y,t.r);
+    g.addColorStop(0, 'rgba('+t.col.c+',1)');
+    g.addColorStop(0.5, 'rgba('+t.col.c+',0.4)');
+    g.addColorStop(1, 'rgba('+t.col.c+',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  if (mouse.on) {
+    ctx.strokeStyle = 'rgba(255,150,50,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, EH+8, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, EH+2, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, EH, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function angMom(p) {
+  if (p.length < 3) return 0;
+  let m = 0;
+  for (let i=2;i<p.length;i++) {
+    const ax=p[i-1].x-p[i-2].x, ay=p[i-1].y-p[i-2].y;
+    const bx=p[i].x-p[i-1].x, by=p[i].y-p[i-1].y;
+    m += Math.abs(ax*by - ay*bx);
+  }
+  return m/p.length;
+}
+
+function velVar(p) {
+  if (p.length < 2) return 0;
+  const v = [];
+  for (let i=1;i<p.length;i++) {
+    const dt = p[i].t-p[i-1].t;
+    if (dt>0) v.push(Math.hypot(p[i].x-p[i-1].x, p[i].y-p[i-1].y)/dt);
+  }
+  if (!v.length) return 0;
+  const avg = v.reduce((a,b)=>a+b,0)/v.length;
+  return v.reduce((a,b)=>a+Math.pow(b-avg,2),0)/v.length;
+}
+
+async function verify() {
+  statEl.textContent = 'Running security checks...';
+  statEl.className = 'status';
+
+  // Run all security checks
+  const reactionCheck = checkReactionTime();
+  const speedCheck = checkSpeedLimits(path);
+  const temporalCheck = checkTemporalConsistency(path);
+  
+  const am = angMom(path);
+  const vv = velVar(path);
+
+  let score = 0;
+  let reasons = [];
+
+  // Security checks (mandatory)
+  if (!reactionCheck.pass) {
+    reasons.push('Reaction: ' + reactionCheck.reason);
+  } else {
+    score += 30;
+    reasons.push('Reaction: ' + reactionCheck.reaction.toFixed(0) + 'ms ✓');
+  }
+
+  if (!speedCheck.pass) {
+    reasons.push('Speed: ' + speedCheck.reason);
+  } else {
+    score += 20;
+    reasons.push('Speed: Normal ✓');
+  }
+
+  if (!temporalCheck.pass) {
+    reasons.push('Temporal: ' + temporalCheck.reason);
+  } else {
+    score += 20;
+    reasons.push('Temporal: Variance ' + temporalCheck.variance.toFixed(2) + ' ✓');
+  }
+
+  // Behavioral checks (bonus)
+  if (am > 5) { score += 15; reasons.push('Angular momentum ✓'); }
+  if (vv > 0.05) { score += 15; reasons.push('Velocity variance ✓'); }
+
+  logEl.textContent = reasons.join(' | ');
+
+  if (score < 70) {
+    state = 'error';
+    cardEl.classList.add('shake');
+    setTimeout(() => cardEl.classList.remove('shake'), 500);
+    instEl.textContent = 'Verification failed';
+    statEl.textContent = 'Score: ' + score + '/100';
+    statEl.className = 'status error';
+    retryEl.classList.add('show');
+    return;
+  }
+
+  try {
+    const res = await fetch('http://localhost:3000/v1/verify', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        siteKey: 'test',
+        telemetry: {path:path, angularMomentum:am, targetsConsumed:3, score:score}
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state = 'done';
+      instEl.textContent = 'You are human!';
+      statEl.textContent = 'Verification Complete (score: ' + score + ')';
+      statEl.className = 'status success';
+      resultEl.textContent = 'Token: ' + data.token.substring(0,32) + '...';
+      resultEl.style.color = '#00ffcc';
+    } else {
+      throw new Error(data.error);
+    }
+  } catch(err) {
+    state = 'error';
+    cardEl.classList.add('shake');
+    setTimeout(() => cardEl.classList.remove('shake'), 500);
+    instEl.textContent = 'Verification failed';
+    statEl.textContent = err.message || 'Please try again';
+    statEl.className = 'status error';
+    retryEl.classList.add('show');
+    resultEl.textContent = '';
+  }
+}
+
+retryEl.addEventListener('click', () => startGame());
+
+frame();
+startGame();
+
+} catch(e) {
+  document.getElementById('inst').textContent = 'Error: ' + e.message;
+  document.getElementById('inst').style.color = '#ff4466';
+  console.error(e);
+}
+</script>
+</body>
+</html>
