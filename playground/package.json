@@ -1,0 +1,12 @@
+{
+  "name": "ecliris-playground",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Open index.html in browser'"
+  },
+  "dependencies": {
+    "@ecliris/core": "workspace:*",
+    "@ecliris/embed": "workspace:*"
+  }
+}
