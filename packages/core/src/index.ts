@@ -4,6 +4,10 @@ export type { EclirisConfig, TelemetryPayload } from './engine';
 export {
   calculateAngularMomentum,
   calculateVelocityVariance,
+  calculateMicroMovements,
+  calculatePathComplexity,
+  checkSpeedLimits,
+  checkTemporalConsistency,
   applyGravity,
   applySpaghettification,
   GRAVITY_RADIUS,
