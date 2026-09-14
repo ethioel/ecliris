@@ -31,22 +31,6 @@
 
 ---
 
-## 🏗️ Architecture
-
-```text
-ecliris/
-├── packages/
-│   ├── core/          # ⚛️ Physics engine (gravity, particles, behavioral math)
-│   ├── embed/         # 🖼️ Client-side Shadow DOM widget
-│   └── server/        # 🔐 Verification API with server-side analysis
-├── playground/        # 🧪 Local development environment
-├── pnpm-workspace.yaml
-├── package.json
-└── tsconfig.base.json
-```
-
----
-
 ## 🔄 How It Works
 
 ```mermaid
