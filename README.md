@@ -63,7 +63,7 @@ sequenceDiagram
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/ecliris.git
+git clone https://github.com/ethioel/ecliris.git
 cd ecliris
 
 # 2. Install dependencies
